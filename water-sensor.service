@@ -1,0 +1,14 @@
+[Unit]
+Description=water-sensor service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -u water_sensors.py
+WorkingDirectory=/home/pi/sensors
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target

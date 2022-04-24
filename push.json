@@ -1,0 +1,7 @@
+{
+    "enabled": false,
+    "token": "Your API Token/Key",
+    "user": "Your User Key",
+    "title": "Push notification title",
+    "sound": "pushover"
+}

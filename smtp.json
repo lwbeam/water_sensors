@@ -1,0 +1,11 @@
+{
+    "enabled": false,
+    "server": "smtp.example.com",
+    "port": 587,
+    "userid": "first.last@example.com",
+    "password": "password",
+    "name": "First Last",
+    "sender": "first.last@example.com",
+    "recipient": "first.last@example.com",
+    "subject": "E-mail Subject Line"
+}
