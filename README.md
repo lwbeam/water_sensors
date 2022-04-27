@@ -1,49 +1,55 @@
 # D-Link Wi-Fi Water Sensor (DCH-S160)
 
-This Python script monitors one or more D-Link DCH-S160 Water Sensors and sends an e-mail and/or push notification whenever a change in status is detected. Specifically, a notification is sent when a sensor:
+This Python 3 script monitors one or more D-Link DCH-S160 Water Sensors and sends an e-mail and/or push notification whenever a change in status is detected. Specifically, a notification is sent when a sensor:
 - detects the presents of water,
 - no longer detects the presents of water,
 - becomes disconnected from the network, or
 - is reconnected to the network.
 
-The script was developed on a Raspberry Pi 3B+ single board computer running Buster, but will likely run on any Linux-based computer, with little or no modification.  Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account. 
+The script was developed on a Raspberry Pi 3B+ single board computer running Buster, but will likely run on any Linux-based computer, with little or no modification. Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account. 
 
 ## Background
 
-The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but was quietly disabled in 2020, even though the app _appears_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 announced that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users will no longer be able to login into their D-Link accounts via this app, the app will be removed from the Apple and Android app stores, and it will cease to function. Furthermore, any devices not supported by D-Link's current mobile app will also become unusable. This includes the DCH-S160 Wi-Fi Water Sensor.
+The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appears_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 [announced](https://www.mydlink.com/faq#id-topFAQ/ans-4242) that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users will no longer be able to login into their D-Link accounts via this app, the app will be removed from the Apple and Android app stores, and it will cease to function. Furthermore, any devices not supported by D-Link's current mobile app will also become unusable. This includes the DCH-S160 Wi-Fi Water Sensor.
 
 ## Installation
 #### 1. Copy Files
 Place the Python script and associated `json` configuration files in the same folder (e.g., `sensors`). This can be done using the following commands:
 ```Shell
 sudo apt install git
-git clone https://github.com/lwbeam/water-sensors sensors
+git clone https://github.com/lwbeam/water_sensors sensors
 cd sensors
 ``` 
+Install dependent Python packages using the following commands:
+```Shell
+sudo apt install python3-pip
+sudo pip3 install aiohttp xmltodict
+```
 Ensure that the script is executable using the following command:
 ```Shell
 chmod +x water_sensors.py
 ``` 
 #### 2. Configure Router
-If your Water Sensor is already connected to your network, to use this script the only thing you **must** do is ensure that your router is configured to assign a static IP address to the sensor. Refer to your router's user manual for instructions on how to accomplish this.
+If your Water Sensor is already connected to your network, the only thing you **must** do to use this script is ensure that your router is configured to assign a static IP address to the sensor. Refer to your router's user manual for instructions on how to accomplish this.
 
-However, if you've aquired a _new_ Water Sensor, have replaced your router, or for whatever reason had to _reset_ an existing Water Sensor, you'll need to configure your router to provide the Water Sensor with access to your Wi-Fi network. In the past this would have been done entirely via the **mydlink Home** app. Without the app, it must be done using Wi-Fi Protected Setup Pushbutton Configuration (WPS-PBC). To accomplish this, complete the following steps:
-- Ensure **Router's WPS-PBC** feature is enabled. Refer to your router's user manual for instructions on how to accomplish this. If your router doesn't have this feature, you'll need to find some other way to allow your sensor access to your Wi-Fi network.
-- **Factory Reset** the Water Sensor. The reset button is located in the hole below the WPS button on the side of the sensor. Using a bent paperclip, hold down the reset button for at least 5 seconds, or until the LED on the side of the senser goes solid red. Release the button and wait until the red light on the **front** of the sensor goes out. The LED on the side should still be solid red.
-- **Power Cycle** the Water Sensor. Unplug the senser, then plug it back in. Wait for light on the **front** of the sensor to go out and the LED on the side of the sensor to blink orange.
+However, if you've aquired a _new_ Water Sensor, replaced your router, or for whatever reason had to _reset_ an existing Water Sensor, you'll need to configure your router to provide the Water Sensor with access to your Wi-Fi network. In the past this would have been done entirely via the **mydlink Home** app. Without the app, it must be done using Wi-Fi Protected Setup Push-Button Configuration (WPS-PBC). To accomplish this, complete the following steps:
+- Ensure **Router's WPS-PBC** feature is enabled. Refer to your router's user manual for instructions on how to accomplish this. If your router doesn't have this feature, you won't be able to connect your Water Sensor to your Wi-Fi network.
+- **Factory Reset** the Water Sensor. The reset button is located in the hole below the WPS button on the side of the sensor. With the sensor plugged in, use a bent paperclip to hold in the reset button for at least 5 seconds, or until the LED on the side of the senser goes solid red. Release the button and wait until the red light on the **front** of the sensor goes out. The LED on the side should still be solid red.
+- **Power Cycle** the Water Sensor. Unplug the senser, then plug it back in. Wait for the light on the **front** of the sensor to go out and the LED on the side of the sensor to blink orange.
 - Press and release the **Router's WPS Button**.
 - Press and release the **Water Sensor's WPS Button**. The LED on the side of the sensor should start to blink green. Wait until it goes solid green.
 - Configure your router to assign a **static IP address** to the Water Sensor.
 
 #### 3. Configure Sensors
-The `config.json` file contains an array of objects; one for each Water Sensor. Each object has five properties: `name`, `address`, `pin`,  `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network or in the alarm state (i.e., has detected water).
+The `config.json` file contains an array of objects; one for each Water Sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`,  `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network or in the alarm state (i.e., has detected water).
 
-To properly configure the script, ensure that there is an object in the `sensor` array for each Water Sensor connected to your network, and update the `name`, `address`, and `pin` for each. `name` is used to identify the Water Sensor in the e-mail and/or push notifications, `address` is its static IP address, and `pin` is its security PIN code (see the label on the back of your Water Sensor). In its present form, the file contains two objects. If you only have one Water Sensor, you must delete the unused object.
+To properly configure the script, ensure that there is an object in the `sensor` array for each Water Sensor connected to your network, and update the `enabled`, `name`, `address`, and `pin` properties for each. `enabled` can be used to _ignore_ a sensor (i.e., disable monitoring it) without having to remove its information from the file. `name` is used to identify the sensor in the e-mail and/or push notifications, `address` is its static IP address, and `pin` is its security PIN code (see the label on the back of the sensor). In its present form, the file contains two objects. If you only have one Water Sensor, you can either delete the unused object or leave its `enabled` property set to `false`.
 
 ```json
 {
     "sensor": [
         {
+            "enabled": true,
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
@@ -51,6 +57,7 @@ To properly configure the script, ensure that there is an object in the `sensor`
             "status": false
         },
         {
+            "enabled": false,
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",

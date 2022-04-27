@@ -1,5 +1,5 @@
 [Unit]
-Description=water-sensor service
+Description=D-Link DCH-S160 Water Sensor Monitor
 After=network.target
 
 [Service]

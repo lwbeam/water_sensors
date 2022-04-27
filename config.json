@@ -1,6 +1,7 @@
 {
     "sensor": [
         {
+            "enabled": true,
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
@@ -8,6 +9,7 @@
             "status": false
         },
         {
+            "enabled": false,
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",

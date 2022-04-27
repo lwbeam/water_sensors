@@ -274,55 +274,57 @@ def main():
             data = json.load(file)
 
         for sensor in data["sensor"]:
-            if not bool(subprocess.call(["ping", "-q", "-w 5", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL)):
+            if sensor["enabled"]:
 
-                loop = asyncio.get_event_loop()
+                if not bool(subprocess.call(["ping", "-q", "-w 5", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL)):
 
-                async def _get_status():
-                    session = aiohttp.ClientSession()
-                    soap = NanoSOAPClient(sensor["address"], ACTION_BASE_URL, loop=loop, session=session)
-                    client = HNAPClient(soap, "Admin", sensor["pin"], loop=loop)
-                    await client.login()
-                    result = await WaterSensor(client).water_detected()
-                    await session.close()
-                    return(result)
+                    loop = asyncio.get_event_loop()
 
-                status = loop.run_until_complete(_get_status())
+                    async def _get_status():
+                        session = aiohttp.ClientSession()
+                        soap = NanoSOAPClient(sensor["address"], ACTION_BASE_URL, loop=loop, session=session)
+                        client = HNAPClient(soap, "Admin", sensor["pin"], loop=loop)
+                        await client.login()
+                        result = await WaterSensor(client).water_detected()
+                        await session.close()
+                        return(result)
 
-                if sensor["status"] != status:  # If sensor status has changed.
-                    if not sensor["status"] and status:  # False --> True.
+                    status = loop.run_until_complete(_get_status())
+
+                    if sensor["status"] != status:  # If sensor status has changed.
+                        if not sensor["status"] and status:  # False --> True.
+                            if smtp["enabled"]:
+                                smtp_message += 'Water detected by ' + sensor["name"] + ' sensor!\n'
+                            if push["enabled"]:
+                                push_message = 'Water detected by ' + sensor["name"] + ' sensor!'
+                        elif sensor["status"] and not status:  # True --> False.
+                            if smtp["enabled"]:
+                                smtp_message += 'Water no longer detected by ' + sensor["name"] + ' sensor.\n'
+                            if push["enabled"]:
+                                push_message = 'Water no longer detected by ' + sensor["name"] + ' sensor.'
+                        sensor["status"] = status
+                        send_message = True
+                        save_config = True
+
+                    if not sensor["online"]:  # If previously off-line.
                         if smtp["enabled"]:
-                            smtp_message += 'Water detected by ' + sensor["name"] + ' sensor!\n'
+                            smtp_message += sensor["name"] + ' water sensor connected to network!\n'
                         if push["enabled"]:
-                            push_message = 'Water detected by ' + sensor["name"] + ' sensor!'
-                    elif sensor["status"] and not status:  # True --> False.
+                            push_message = sensor["name"] + ' water sensor connected to network!'
+                        sensor["online"] = True
+                        send_message = True
+                        save_config = True
+
+                else:
+                    all_online = False
+                    if sensor["online"]:  # If previously on-line.
                         if smtp["enabled"]:
-                            smtp_message += 'Water no longer detected by ' + sensor["name"] + ' sensor.\n'
+                            smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
                         if push["enabled"]:
-                            push_message = 'Water no longer detected by ' + sensor["name"] + ' sensor.'
-                    sensor["status"] = status
-                    send_message = True
-                    save_config = True
-
-                if not sensor["online"]:  # If previously off-line.
-                    if smtp["enabled"]:
-                        smtp_message += sensor["name"] + ' water sensor connected to network!\n'
-                    if push["enabled"]:
-                        push_message = sensor["name"] + ' water sensor connected to network!'
-                    sensor["online"] = True
-                    send_message = True
-                    save_config = True
-
-            else:
-                all_online = False
-                if sensor["online"]:  # If previously on-line.
-                    if smtp["enabled"]:
-                        smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
-                    if push["enabled"]:
-                        push_message = sensor["name"] + ' water sensor not connected to network!'
-                    sensor["online"] = False
-                    send_message = True
-                    save_config = True
+                            push_message = sensor["name"] + ' water sensor not connected to network!'
+                        sensor["online"] = False
+                        send_message = True
+                        save_config = True
 
         # Send message, if sensor status has changed.
 
