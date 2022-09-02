@@ -239,6 +239,7 @@ def main():
     import http.client
     from time import sleep
 
+    push_messages = list()
     day = datetime.now().day
 
     if os.path.exists("smtp.json"):
@@ -263,10 +264,11 @@ def main():
             smtp_message += 'Date: ' + datetime.now().strftime("%d-%b-%Y") + '\n'
             smtp_message += 'Time: ' + datetime.now().strftime("%H:%M:%S") + '\n\n'
             smtp_message += 'NOTE:\n\n'
+        if push["enabled"]:
+            push_messages.clear()
 
         all_online = True
-        send_message = False
-        save_config = False
+        status_changed = False
 
         # Get name, address, pin, online, and status for each sensor.
 
@@ -296,24 +298,22 @@ def main():
                             if smtp["enabled"]:
                                 smtp_message += 'Water detected by ' + sensor["name"] + ' sensor!\n'
                             if push["enabled"]:
-                                push_message = 'Water detected by ' + sensor["name"] + ' sensor!'
+                                push_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
                         elif sensor["status"] and not status:  # True --> False.
                             if smtp["enabled"]:
                                 smtp_message += 'Water no longer detected by ' + sensor["name"] + ' sensor.\n'
                             if push["enabled"]:
-                                push_message = 'Water no longer detected by ' + sensor["name"] + ' sensor.'
+                                push_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
                         sensor["status"] = status
-                        send_message = True
-                        save_config = True
+                        status_changed = True
 
                     if not sensor["online"]:  # If previously off-line.
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor connected to network!\n'
                         if push["enabled"]:
-                            push_message = sensor["name"] + ' water sensor connected to network!'
+                            push_messages.append(sensor["name"] + ' water sensor connected to network!')
                         sensor["online"] = True
-                        send_message = True
-                        save_config = True
+                        status_changed = True
 
                 else:
                     all_online = False
@@ -321,14 +321,15 @@ def main():
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
                         if push["enabled"]:
-                            push_message = sensor["name"] + ' water sensor not connected to network!'
+                            push_messages.append(sensor["name"] + ' water sensor not connected to network!')
                         sensor["online"] = False
-                        send_message = True
-                        save_config = True
+                        status_changed = True
 
-        # Send message, if sensor status has changed.
+        sleep(10)
 
-        if send_message:
+        # If sensor status has changed, send message(s) and/or save configuration.
+
+        if status_changed:
 
             if smtp["enabled"]:
                 server = smtplib.SMTP(smtp["server"], smtp["port"])
@@ -339,20 +340,18 @@ def main():
                 server.sendmail(smtp["sender"], smtp["recipient"], smtp_message)
 
             if push["enabled"]:
-                conn = http.client.HTTPSConnection("api.pushover.net:443")
-                conn.request("POST", "/1/messages.json",
-                  urllib.parse.urlencode({
-                    "token": push["token"],
-                    "user": push["user"],
-                    "title": push["title"],
-                    "sound": push["sound"],
-                    "message": push_message
-                  }), { "Content-type": "application/x-www-form-urlencoded" })
-                conn.getresponse()
+                for message in push_messages:
+                    conn = http.client.HTTPSConnection("api.pushover.net:443")
+                    conn.request("POST", "/1/messages.json",
+                      urllib.parse.urlencode({
+                        "token": push["token"],
+                        "user": push["user"],
+                        "title": push["title"],
+                        "sound": push["sound"],
+                        "message": message
+                      }), { "Content-type": "application/x-www-form-urlencoded" })
+                    conn.getresponse()
 
-        # Save configuration, only if it has changed.
-
-        if save_config:
             with open("config.json", "w") as file:
                 json.dump(data, file, indent=4)
 

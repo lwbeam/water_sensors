@@ -3,6 +3,7 @@ Description=D-Link DCH-S160 Water Sensor Monitor
 After=network.target
 
 [Service]
+ExecStartPre=/bin/sleep 10
 ExecStart=/usr/bin/python3 -u water_sensors.py
 WorkingDirectory=/home/pi/sensors
 StandardOutput=inherit

@@ -83,6 +83,7 @@ The `smtp.json` file contains a single object, with nine properties. To enable e
     "subject": "E-mail Subject Line"
 }
 ```
+Whenever possible, the script bundles e-mail notifications together and sends them as a single message.
 #### 5. Push Notification (optional)
 Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account. When you create an account, you're assigned a unique _user key_. You'll also need to create a _token_ for this application. Pushover offers a free 30-day trial period, after which you're charged a small one-time fee to continue using their service. I have no affiliation with Pushover, and simply chose it because I was already using it for another application. 
 
@@ -96,8 +97,9 @@ The `push.json` file contains a single object, with five properties. To enable p
     "sound": "pushover"
 }
 ```
+Note that there are length limits associated with push notifications. Messages sent to **Android** devices have a title limit of 65 characters and a description limit of 240 characters. However, **iOS** devices have a combined limit of only 178 characters (about four lines of text). These limits should be taken into consideration when assigning a sensor's `name` and the push notification `title`. To ensure these limits are not exceeded, the script sends each push notification separately.
 #### 6. Create Service
-The Python script is designed to run as a `service`. To create the service, place definition file `water-sensor.service` in the `/etc/systemd/system` folder. In its present form, this file assumes that the script and associated configuration files were placed in the `/home/pi/sensors` folder. If this is not the case, `WorkingDirectory` (line 7) must be updated with their correct location. Start the service using the following commands:
+The Python script is designed to run as a `service`. To create the service, place definition file `water-sensor.service` in the `/etc/systemd/system` folder. In its present form, this file assumes that the script and associated configuration files were placed in the `/home/pi/sensors` folder. If this is not the case, `WorkingDirectory` (line 8) must be updated with their correct location. Start the service using the following commands:
 
 ```Shell
 sudo chmod 644 /etc/systemd/system/water-sensor.service
@@ -105,6 +107,5 @@ sudo systemctl daemon-reload
 sudo systemctl enable water-sensor.service
 sudo systemctl start water-sensor.service
 ```
-
 ## Acknowledgements
 I've spent many hours attempting to gain a basic understanding of SOAP and HNAP, and am no closer to being able to produce anything remotely useable. As a result, the Python classes (`NanoSOAPClient` and `HNAPClient`) used in this script, were shamelessly _borrowed_ from [Pierre Ståhl](https://github.com/postlund/dlink_hnap). I must also _confess_ that the class `WaterSensor` is based entirely on another of his Python classes, and that other bits of his code have found their way into my `Main` function. I am extremely grateful to him for sharing his code.
