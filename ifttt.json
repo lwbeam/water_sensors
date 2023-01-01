@@ -1,0 +1,8 @@
+{
+    "enabled": false,
+    "key": "Webhooks Key",
+    "event": "Event Name",
+    "value1": "IFTTT notification title",
+    "value2": "not used",
+    "value3": "not used"
+}

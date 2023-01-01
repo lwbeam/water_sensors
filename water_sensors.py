@@ -240,6 +240,7 @@ def main():
     from time import sleep
 
     push_messages = list()
+    ifttt_messages = list()
     day = datetime.now().day
 
     if os.path.exists("smtp.json"):
@@ -254,6 +255,12 @@ def main():
     else:
         push = {"enabled": False}
 
+    if os.path.exists("ifttt.json"):
+        with open("ifttt.json") as ifttt_file:
+            ifttt = json.load(ifttt_file)
+    else:
+        ifttt = {"enabled": False}
+
 
     while True:
 
@@ -266,6 +273,8 @@ def main():
             smtp_message += 'NOTE:\n\n'
         if push["enabled"]:
             push_messages.clear()
+        if ifttt["enabled"]:
+            ifttt_messages.clear()
 
         all_online = True
         status_changed = False
@@ -278,7 +287,7 @@ def main():
         for sensor in data["sensor"]:
             if sensor["enabled"]:
 
-                if not bool(subprocess.call(["ping", "-q", "-w 5", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL)):
+                if not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL)):
 
                     loop = asyncio.get_event_loop()
 
@@ -299,11 +308,15 @@ def main():
                                 smtp_message += 'Water detected by ' + sensor["name"] + ' sensor!\n'
                             if push["enabled"]:
                                 push_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
+                            if ifttt["enabled"]:
+                                ifttt_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
                         elif sensor["status"] and not status:  # True --> False.
                             if smtp["enabled"]:
                                 smtp_message += 'Water no longer detected by ' + sensor["name"] + ' sensor.\n'
                             if push["enabled"]:
                                 push_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
+                            if ifttt["enabled"]:
+                                ifttt_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
                         sensor["status"] = status
                         status_changed = True
 
@@ -312,6 +325,8 @@ def main():
                             smtp_message += sensor["name"] + ' water sensor connected to network!\n'
                         if push["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor connected to network!')
+                        if ifttt["enabled"]:
+                            ifttt_messages.append(sensor["name"] + ' water sensor connected to network!')
                         sensor["online"] = True
                         status_changed = True
 
@@ -322,6 +337,8 @@ def main():
                             smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
                         if push["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor not connected to network!')
+                        if ifttt["enabled"]:
+                            ifttt_messages.append(sensor["name"] + ' water sensor not connected to network!')
                         sensor["online"] = False
                         status_changed = True
 
@@ -341,8 +358,8 @@ def main():
 
             if push["enabled"]:
                 for message in push_messages:
-                    conn = http.client.HTTPSConnection("api.pushover.net:443")
-                    conn.request("POST", "/1/messages.json",
+                    push_conn = http.client.HTTPSConnection("api.pushover.net:443")
+                    push_conn.request("POST", "/1/messages.json",
                       urllib.parse.urlencode({
                         "token": push["token"],
                         "user": push["user"],
@@ -350,7 +367,15 @@ def main():
                         "sound": push["sound"],
                         "message": message
                       }), { "Content-type": "application/x-www-form-urlencoded" })
-                    conn.getresponse()
+                    push_conn.getresponse()
+
+            if ifttt["enabled"]:
+                for message in ifttt_messages:
+                    ifttt_conn = http.client.HTTPSConnection("maker.ifttt.com:443")
+                    ifttt_conn.request("POST", "/trigger/" + ifttt["event"] + "/with/key/" + ifttt["key"],
+                      ('{ "value1": \"' + ifttt["value1"] + '\", "value2": \"' + message + '\", "value3": \"' + ifttt["value3"] + '\" }'),
+                      { "Content-type": "application/json" })
+                    ifttt_conn.getresponse()
 
             with open("config.json", "w") as file:
                 json.dump(data, file, indent=4)
