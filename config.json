@@ -5,7 +5,7 @@
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
-            "online": true,
+            "online": 3,
             "status": false
         },
         {
@@ -13,7 +13,7 @@
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
-            "online": true,
+            "online": 3,
             "status": false
         }
     ]

@@ -243,6 +243,8 @@ def main():
     ifttt_messages = list()
     day = datetime.now().day
 
+    failed_pings = 3  # Any integer value greater than zero.
+
     if os.path.exists("smtp.json"):
         with open("smtp.json") as smtp_file:
             smtp = json.load(smtp_file)
@@ -277,7 +279,8 @@ def main():
             ifttt_messages.clear()
 
         all_online = True
-        status_changed = False
+        save_change = False
+        send_message = False
 
         # Get name, address, pin, online, and status for each sensor.
 
@@ -318,35 +321,44 @@ def main():
                             if ifttt["enabled"]:
                                 ifttt_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
                         sensor["status"] = status
-                        status_changed = True
+                        save_change = True
+                        send_message = True
 
-                    if not sensor["online"]:  # If previously off-line.
+                    if sensor["online"] == 0:  # If previously off-line.
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor connected to network!\n'
                         if push["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor connected to network!')
                         if ifttt["enabled"]:
                             ifttt_messages.append(sensor["name"] + ' water sensor connected to network!')
-                        sensor["online"] = True
-                        status_changed = True
+                        send_message = True
+
+                    if sensor["online"] < failed_pings:  # Reset counter.
+                        sensor["online"] = failed_pings
+                        save_change = True
 
                 else:
-                    all_online = False
-                    if sensor["online"]:  # If previously on-line.
+                    if sensor["online"] == 1:  # If previously on-line.
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
                         if push["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor not connected to network!')
                         if ifttt["enabled"]:
                             ifttt_messages.append(sensor["name"] + ' water sensor not connected to network!')
-                        sensor["online"] = False
-                        status_changed = True
+                        send_message = True
+
+                    if sensor["online"] > 0:  # Decrement counter.
+                        sensor["online"] -= 1
+                        save_change = True
+
+                    if sensor["online"] == 0:  # If off-line.
+                        all_online = False
 
         sleep(10)
 
         # If sensor status has changed, send message(s) and/or save configuration.
 
-        if status_changed:
+        if send_message:
 
             if smtp["enabled"]:
                 server = smtplib.SMTP(smtp["server"], smtp["port"])
@@ -376,6 +388,8 @@ def main():
                       ('{ "value1": \"' + ifttt["value1"] + '\", "value2": \"' + message + '\", "value3": \"' + ifttt["value3"] + '\" }'),
                       { "Content-type": "application/json" })
                     ifttt_conn.getresponse()
+
+        if save_change:
 
             with open("config.json", "w") as file:
                 json.dump(data, file, indent=4)

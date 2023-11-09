@@ -12,7 +12,7 @@ The script also includes rudimentary [IFTTT](https://ifttt.com) support, which c
 
 ## Background
 
-The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appears_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 [announced](https://www.mydlink.com/faq#id-topFAQ/ans-4242) that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users will no longer be able to login into their D-Link accounts via this app, the app will be removed from the Apple and Android app stores, and it will cease to function. As a result, any device **not supported** by D-Link's current mobile apps will also become unusable. This includes the DCH-S160 Wi-Fi Water Sensor.
+The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appeared_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 [announced](https://www.mydlink.com/faq#id-topFAQ/ans-4242) that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users were no longer able to login into their D-Link accounts via this app, the app was removed from the Apple and Android app stores, and it ceased to function. As a result, any device **not supported** by D-Link's current mobile apps has become unusable. This includes the DCH-S160 Wi-Fi Water Sensor.
 
 ## Installation
 #### 1. Copy Files
@@ -43,7 +43,7 @@ However, if you've aquired a _new_ Water Sensor, replaced your router, or for wh
 - Configure your router to assign a **static IP address** to the Water Sensor.
 
 #### 3. Configure Sensors
-The `config.json` file contains an array of objects; one for each Water Sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`,  `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network or in the alarm state (i.e., has detected water).
+The `config.json` file contains an array of objects; one for each Water Sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`,  `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network (`3`, `2` or `1` = _online_; `0` = _offline_) or in the alarm state (`true` = _water detected_; `false` = _water not detected_). Note that `online` actually tracks the remaining number of consecutive times a sensor is allowed to **not** respond to a _ping_ before it is considered _offline_. This was altered (from simply `true` or `false`) in an attempt to reduce the number of nuisance notifications due to intermittent Wi-Fi interference (e.g., microwave ovens), and can be adjusted by changing the value assigned to `failed_pings` on line 246 of `water_sensors.py`. 
 
 To properly configure the script, ensure that there is an object in the `sensor` array for each Water Sensor connected to your network, and update the `enabled`, `name`, `address`, and `pin` properties for each. `enabled` can be used to _ignore_ a sensor (i.e., disable monitoring it) without having to remove its information from the file. `name` is used to identify the sensor in the e-mail and/or push notifications, `address` is its static IP address, and `pin` is its security PIN code (see the label on the back of the sensor). In its present form, the file contains two objects. If you only have one Water Sensor, you can either delete the unused object or leave its `enabled` property set to `false`.
 
@@ -55,7 +55,7 @@ To properly configure the script, ensure that there is an object in the `sensor`
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
-            "online": true,
+            "online": 3,
             "status": false
         },
         {
@@ -63,7 +63,7 @@ To properly configure the script, ensure that there is an object in the `sensor`
             "name": "Your name for this sensor or its location",
             "address": "XXX.XXX.XXX.XXX",
             "pin": "123456",
-            "online": true,
+            "online": 3,
             "status": false
         }
     ]
