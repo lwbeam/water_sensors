@@ -1,55 +1,60 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
-#  Read data from D-Link Water Sensor.
+# Monitor D-Link Water Sensor status.
 
-import xml
 import hmac
 import logging
 import asyncio
 import aiohttp
+import xmltodict
 import xml.etree.ElementTree as ET
 
 from io import BytesIO
 from datetime import datetime
 
-import xmltodict
-
 _LOGGER = logging.getLogger(__name__)
 
-ACTION_BASE_URL = "http://purenetworks.com/HNAP1/"
-
-
 def _hmac(key, message):
-    return (
-        hmac.new(key.encode("utf-8"), message.encode("utf-8"), digestmod="MD5")
-        .hexdigest()
-        .upper()
-    )
+    return (hmac.new(key.encode("utf-8"), message.encode("utf-8"), digestmod="MD5").hexdigest().upper())
 
 
 class AuthenticationError(Exception):
-    #  Thrown when login fails.
-    pass
+
+    """ Thrown when exception encountered. """
+
+    def __init__(self, message):
+        self.message = message
+        _LOGGER.error("Authentication Error: %s", self.message)
 
 
-class NanoSOAPClient:
+class HNAPClient:
 
+    """ Handles device login and HNAP request formatting, and returns response. """
+
+    ACTION_URL = "http://purenetworks.com/HNAP1/"
+    ACTION_NS = {"xmlns": ACTION_URL}
     BASE_NS = {
-        "xmlns:soap": "http://schemas.xmlsoap.org/soap/envelope/",
-        "xmlns:xsd": "http://www.w3.org/2001/XMLSchema",
-        "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
-    }
+               "xmlns:soap": "http://schemas.xmlsoap.org/soap/envelope/",
+               "xmlns:xsd": "http://www.w3.org/2001/XMLSchema",
+               "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+              }
 
-    ACTION_NS = {"xmlns": "http://purenetworks.com/HNAP1/"}
 
-    def __init__(self, address, action, loop=None, session=None):
-        self.address = "http://{0}/HNAP1".format(address)
-        self.action = action
-        self.loop = loop or asyncio.get_event_loop()
-        self.session = session or aiohttp.ClientSession(loop=loop)
+    def __init__(self, address, username, password, loop=None, session=None):
+
+        self.address = address
+        self.username = username
+        self.password = password
+        self.loop = loop
+        self.session = session
+        self.private_key = None
+        self.auth_token = None
+        self.cookie = None
         self.headers = {}
 
+
     def _generate_request_xml(self, method, **kwargs):
+
         body = ET.Element("soap:Body")
         action = ET.Element(method, self.ACTION_NS)
         body.append(action)
@@ -68,164 +73,61 @@ class NanoSOAPClient:
 
         return f.getvalue().decode("utf-8")
 
-    async def call(self, method, **kwargs):
-        xml = self._generate_request_xml(method, **kwargs)
 
-        headers = self.headers.copy()
-        headers["SOAPAction"] = '"{0}{1}"'.format(self.action, method)
+    async def _login(self):  # Login to device, and obtain credentials.
 
-        resp = await self.session.post(
-            self.address, data=xml, headers=headers, timeout=10
-        )
+        resp = await self.call("Login", Action="request", Username=self.username, LoginPassword="", Captcha="")
+        self.challenge = resp["Challenge"]
+        self.public_key = resp["PublicKey"]
+        self.cookie = resp["Cookie"]
+        _LOGGER.debug("Challenge: %s, Public key: %s, Cookie: %s", self.challenge, self.public_key, self.cookie)
+
+        self.private_key = _hmac(self.public_key + str(self.password), self.challenge)
+        _LOGGER.debug("Private key: %s", self.private_key)
+
+        _password = _hmac(self.private_key, self.challenge)
+
+        resp = await self.call("Login", Action="login", Username=self.username, LoginPassword=_password, Captcha="")
+        if resp["LoginResult"].lower() != "success":
+            raise AuthenticationError("Login failed!")
+
+        return
+
+
+    async def call(self, action, *args, **kwargs):  # Update message, initiate request, and return action response.
+
+        if action != "Login":
+            _LOGGER.info("Logging into device at: %s", self.address)
+            await self._login()
+
+        _timestamp = int(datetime.now().timestamp())
+        _data = self._generate_request_xml(action, **kwargs)
+
+        _headers = self.headers.copy()
+        _headers["SOAPAction"] = '"{0}{1}"'.format(self.ACTION_URL, action)
+
+        if self.private_key:
+            self.auth_token = _hmac(self.private_key, '{0}"{1}{2}"'.format(_timestamp, self.ACTION_URL, action))
+            _LOGGER.debug("Generated new token for %s: %s (time: %d)", action, self.auth_token, _timestamp)
+
+        if self.auth_token:
+            _headers["HNAP_AUTH"] = "{0} {1}".format(self.auth_token, _timestamp)
+
+        if self.cookie:
+            _headers["Cookie"] = "uid={0}".format(self.cookie)
+
+        resp = await self.session.post("http://{0}/HNAP1".format(self.address), data=_data, headers=_headers, timeout=10)
         text = await resp.text()
-        parsed = xmltodict.parse(text)
-        if "soap:Envelope" not in parsed:
-            _LOGGER.error("parsed: " + str(parsed))
-            raise Exception("probably a bad response")
 
-        return parsed["soap:Envelope"]["soap:Body"][method + "Response"]
+        if "soap:Envelope" in text:
+            try:
+                parsed = xmltodict.parse(text)
+            except xml.parsers.expat.ExpatError:
+                raise AuthenticationError("XML parser error!")
+        else:
+            raise AuthenticationError("Bad SOAP response!")
 
-
-class HNAPClient:
-    #  Client for the HNAP protocol.
-
-    def __init__(self, soap, username, password, loop=None):
-        #  Initialize a new HNAPClient instance.
-        self.username = username
-        self.password = password
-        self.logged_in = False
-        self.loop = loop or asyncio.get_event_loop()
-        self.actions = None
-        self._client = soap
-        self._private_key = None
-        self._cookie = None
-        self._auth_token = None
-        self._timestamp = None
-
-    async def login(self):
-        #  Authenticate with device and obtain cookie.
-        _LOGGER.info("Logging into device")
-        self.logged_in = False
-        resp = await self.call(
-            "Login",
-            Action="request",
-            Username=self.username,
-            LoginPassword="",
-            Captcha="",
-        )
-
-        challenge = resp["Challenge"]
-        public_key = resp["PublicKey"]
-        self._cookie = resp["Cookie"]
-        _LOGGER.debug(
-            "Challenge: %s, Public key: %s, Cookie: %s",
-            challenge,
-            public_key,
-            self._cookie,
-        )
-
-        self._private_key = _hmac(public_key + str(self.password), challenge)
-        _LOGGER.debug("Private key: %s", self._private_key)
-
-        try:
-            password = _hmac(self._private_key, challenge)
-            resp = await self.call(
-                "Login",
-                Action="login",
-                Username=self.username,
-                LoginPassword=password,
-                Captcha="",
-            )
-
-            if resp["LoginResult"].lower() != "success":
-                raise AuthenticationError("Incorrect username or password")
-
-            if not self.actions:
-                self.actions = await self.device_actions()
-
-        except xml.parsers.expat.ExpatError:
-            raise AuthenticationError("Bad response from device")
-
-        self.logged_in = True
-
-    async def device_actions(self):
-        actions = await self.call("GetDeviceSettings")
-        return list(
-            map(lambda x: x[x.rfind("/") + 1 :], actions["SOAPActions"]["string"])
-        )
-
-    async def soap_actions(self, module_id):
-        return await self.call("GetModuleSOAPActions", ModuleID=module_id)
-
-    async def call(self, method, *args, **kwargs):
-        #  Call an NHAP method (async).
-        #  Do login if no login has been done before.
-        if not self._private_key and method != "Login":
-            await self.login()
-
-        self._update_nauth_token(method)
-        try:
-            result = await self.soap().call(method, **kwargs)
-            if "ERROR" in result:
-                self._bad_response()
-        except:
-            self._bad_response()
-        return result
-
-    def _bad_response(self):
-        _LOGGER.error("Got an error, resetting private key")
-        self._private_key = None
-        raise Exception("got error response from device")
-
-    def _update_nauth_token(self, action):
-        #  Update NHAP auth token for an action.
-        if not self._private_key:
-            return
-
-        self._timestamp = int(datetime.now().timestamp())
-        self._auth_token = _hmac(
-            self._private_key,
-            '{0}"{1}{2}"'.format(self._timestamp, ACTION_BASE_URL, action),
-        )
-        _LOGGER.debug(
-            "Generated new token for %s: %s (time: %d)",
-            action,
-            self._auth_token,
-            self._timestamp,
-        )
-
-    def soap(self):
-        #  Get SOAP client with updated headers.
-        if self._cookie:
-            self._client.headers["Cookie"] = "uid={0}".format(self._cookie)
-        if self._auth_token:
-            self._client.headers["HNAP_AUTH"] = "{0} {1}".format(
-                self._auth_token, self._timestamp
-            )
-
-        return self._client
-
-
-class WaterSensor:
-    #  Wrapper class for Water Sensor.
-
-    def __init__(self, client, module_id=1):
-        #  Initialize a new sensor instance.
-        self.client = client
-        self.module_id = module_id
-        self._soap_actions = None
-
-    async def _cache_soap_actions(self):
-        resp = await self.client.soap_actions(self.module_id)
-        self._soap_actions = resp["ModuleSOAPList"]["SOAPActions"]["Action"]
-
-    async def water_detected(self):
-        #  Get latest trigger time from sensor.
-        if not self._soap_actions:
-            await self._cache_soap_actions()
-
-        resp = await self.client.call("GetWaterDetectorState", ModuleID=self.module_id)
-        return resp.get("IsWater") == "true"
+        return parsed["soap:Envelope"]["soap:Body"][action + "Response"]
 
 
 def main():
@@ -240,10 +142,48 @@ def main():
     from time import sleep
 
     push_messages = list()
-    ifttt_messages = list()
     day = datetime.now().day
 
-    failed_pings = 3  # Any integer value greater than zero.
+    total_attempts = 3  # Any integer value greater than zero.
+
+
+    async def post_request(address, password, action, state, **kwargs):
+
+        #  Water Sensor
+        #  ------------
+        #  Action / State - GetWaterDetectorState / IsWater
+
+        #  Siren
+        #  ------------
+        #  Action / State - SetSoundPlay / None, SetAlarmDismissed / None, Reboot / None, GetSirenAlarmSettings / IsSounding
+        #  Sound Type     - 1 = Emergency, 2 = Fire, 3 = Ambulance, 4 = Police, 5 = Door Chime, 6 = Beep
+        #  Volume         - 1 to 100
+        #  Duration       - 1 to 88888
+
+        session = aiohttp.ClientSession()
+
+        i = 2
+        while i > 0:
+            try:
+                client = HNAPClient(address, "Admin", password, loop=loop, session=session)
+                resp = await client.call(action, ModuleID=1, **kwargs)
+
+                if resp[action + "Result"].upper() != "OK":
+                    raise AuthenticationError("Bad HNAP response!")
+                else:
+                    await session.close()
+                    break
+
+            except AuthenticationError:
+                i -= 1
+                _LOGGER.debug("Attempts remaining: %s", i)
+
+                if i == 0:
+                    await session.close()
+                    raise AuthenticationError("Device not responding, assumed off-line!")
+
+        return None if state == None else resp.get(state) == "true"
+
 
     if os.path.exists("smtp.json"):
         with open("smtp.json") as smtp_file:
@@ -273,92 +213,156 @@ def main():
             smtp_message += 'Date: ' + datetime.now().strftime("%d-%b-%Y") + '\n'
             smtp_message += 'Time: ' + datetime.now().strftime("%H:%M:%S") + '\n\n'
             smtp_message += 'NOTE:\n\n'
-        if push["enabled"]:
+        if push["enabled"] or ifttt["enabled"]:
             push_messages.clear()
-        if ifttt["enabled"]:
-            ifttt_messages.clear()
 
         all_online = True
-        save_change = False
+        save_siren = False
+        save_sensor = False
         send_message = False
 
-        # Get name, address, pin, online, and status for each sensor.
+        if os.path.exists("siren.json"):  # Get address, pin, online, sound, volume and duration for siren.
+            with open("siren.json") as siren_file:
+                siren = json.load(siren_file)
+        else:
+            siren = {"enabled": False}
 
-        with open("config.json") as file:
+        if siren["enabled"]:  # If enabled, check if siren is on-line.
+
+            on_line = not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", siren["address"]], stdout = subprocess.DEVNULL))
+            if on_line:
+                try:
+                    loop = asyncio.get_event_loop()
+                    if siren["test"]:
+                        loop.run_until_complete(post_request(  # Test siren.
+                            siren["address"], siren["pin"], "SetSoundPlay", None, SoundType=1, Volume=1, Duration=1
+                        ))
+                        siren["test"] = False
+                        save_siren = True
+                    status = loop.run_until_complete(post_request(  # Get siren status.
+                        siren["address"], siren["pin"], "GetSirenAlarmSettings", "IsSounding"
+                    ))
+                    _LOGGER.info("Siren status: %s", status)
+                except AuthenticationError:
+                    on_line = False
+
+            if on_line:
+                if siren["online"] == 0:  # If previously off-line.
+                    if smtp["enabled"]:
+                        smtp_message += 'Siren connected to network!\n'
+                    if push["enabled"] or ifttt["enabled"]:
+                        push_messages.append('Siren connected to network!')
+                    send_message = True
+
+                if siren["online"] < total_attempts:  # Reset counter.
+                    siren["online"] = total_attempts
+                    save_siren = True
+            else:
+                if siren["online"] == 1:  # If previously on-line, and very last attempt failed.
+                    if smtp["enabled"]:
+                        smtp_message += 'Siren not connected to network!\n'
+                    if push["enabled"] or ifttt["enabled"]:
+                        push_messages.append('Siren not connected to network!')
+                    send_message = True
+
+                if siren["online"] > 0:  # Decrement counter.
+                    siren["online"] -= 1
+                    save_siren = True
+
+                if siren["online"] == 0:  # If off-line.
+                    all_online = False
+
+            sleep(2)
+
+        with open("config.json") as file:  # Get name, address, pin, online, and status for each sensor.
             data = json.load(file)
 
         for sensor in data["sensor"]:
             if sensor["enabled"]:
 
-                if not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL)):
+                on_line = not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL))
+                if on_line:
+                    try:
+                        loop = asyncio.get_event_loop()
+                        status = loop.run_until_complete(post_request(  # Get water sensor status.
+                            sensor["address"], sensor["pin"], "GetWaterDetectorState", "IsWater"
+                        ))
+                        _LOGGER.info("Sensor status: %s", status)
+                    except AuthenticationError:
+                        on_line = False
 
-                    loop = asyncio.get_event_loop()
-
-                    async def _get_status():
-                        session = aiohttp.ClientSession()
-                        soap = NanoSOAPClient(sensor["address"], ACTION_BASE_URL, loop=loop, session=session)
-                        client = HNAPClient(soap, "Admin", sensor["pin"], loop=loop)
-                        await client.login()
-                        result = await WaterSensor(client).water_detected()
-                        await session.close()
-                        return(result)
-
-                    status = loop.run_until_complete(_get_status())
-
+                if on_line:
                     if sensor["status"] != status:  # If sensor status has changed.
                         if not sensor["status"] and status:  # False --> True.
                             if smtp["enabled"]:
                                 smtp_message += 'Water detected by ' + sensor["name"] + ' sensor!\n'
-                            if push["enabled"]:
+                            if push["enabled"] or ifttt["enabled"]:
                                 push_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
-                            if ifttt["enabled"]:
-                                ifttt_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
+
+                            if siren["enabled"] and siren["online"] == total_attempts:
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                    loop.run_until_complete(post_request(  # Start siren.
+                                        siren["address"], siren["pin"], "SetSoundPlay", None,
+                                        SoundType=siren["sound"], Volume=siren["volume"], Duration=siren["duration"]
+                                    ))
+                                except AuthenticationError:
+                                    if siren["online"] > 1:  # Decrement counter.
+                                        siren["online"] -= 1
+                                        save_siren = True
+
                         elif sensor["status"] and not status:  # True --> False.
                             if smtp["enabled"]:
                                 smtp_message += 'Water no longer detected by ' + sensor["name"] + ' sensor.\n'
-                            if push["enabled"]:
+                            if push["enabled"] or ifttt["enabled"]:
                                 push_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
-                            if ifttt["enabled"]:
-                                ifttt_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
+
+                            if siren["enabled"] and siren["online"] == total_attempts:
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                    loop.run_until_complete(post_request(  # Stop siren.
+                                        siren["address"], siren["pin"], "SetAlarmDismissed", None
+                                    ))
+                                except AuthenticationError:
+                                    if siren["online"] > 1:  # Decrement counter.
+                                        siren["online"] -= 1
+                                        save_siren = True
+
                         sensor["status"] = status
-                        save_change = True
+                        save_sensor = True
                         send_message = True
 
                     if sensor["online"] == 0:  # If previously off-line.
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor connected to network!\n'
-                        if push["enabled"]:
+                        if push["enabled"] or ifttt["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor connected to network!')
-                        if ifttt["enabled"]:
-                            ifttt_messages.append(sensor["name"] + ' water sensor connected to network!')
                         send_message = True
 
-                    if sensor["online"] < failed_pings:  # Reset counter.
-                        sensor["online"] = failed_pings
-                        save_change = True
+                    if sensor["online"] < total_attempts:  # Reset counter.
+                        sensor["online"] = total_attempts
+                        save_sensor = True
 
                 else:
-                    if sensor["online"] == 1:  # If previously on-line.
+                    if sensor["online"] == 1:  # If previously on-line, and very last attempt failed.
                         if smtp["enabled"]:
                             smtp_message += sensor["name"] + ' water sensor not connected to network!\n'
-                        if push["enabled"]:
+                        if push["enabled"] or ifttt["enabled"]:
                             push_messages.append(sensor["name"] + ' water sensor not connected to network!')
-                        if ifttt["enabled"]:
-                            ifttt_messages.append(sensor["name"] + ' water sensor not connected to network!')
                         send_message = True
 
                     if sensor["online"] > 0:  # Decrement counter.
                         sensor["online"] -= 1
-                        save_change = True
+                        save_sensor = True
 
                     if sensor["online"] == 0:  # If off-line.
                         all_online = False
 
+                sleep(2)
+
         sleep(10)
 
-        # If sensor status has changed, send message(s) and/or save configuration.
-
-        if send_message:
+        if send_message:  # If device status has changed, send message(s) and/or save configuration.
 
             if smtp["enabled"]:
                 server = smtplib.SMTP(smtp["server"], smtp["port"])
@@ -382,23 +386,24 @@ def main():
                     push_conn.getresponse()
 
             if ifttt["enabled"]:
-                for message in ifttt_messages:
+                for message in push_messages:
                     ifttt_conn = http.client.HTTPSConnection("maker.ifttt.com:443")
                     ifttt_conn.request("POST", "/trigger/" + ifttt["event"] + "/with/key/" + ifttt["key"],
                       ('{ "value1": \"' + ifttt["value1"] + '\", "value2": \"' + message + '\", "value3": \"' + ifttt["value3"] + '\" }'),
                       { "Content-type": "application/json" })
                     ifttt_conn.getresponse()
 
-        if save_change:
+        if save_siren:
+            with open("siren.json", "w") as file:
+                json.dump(siren, file, indent=4)
 
+        if save_sensor:
             with open("config.json", "w") as file:
                 json.dump(data, file, indent=4)
 
-        # Place message in system log once per day, only if all sensors are on-line.
-
-        if all_online and day != datetime.now().day:
+        if all_online and day != datetime.now().day:  # If all devices are on-line, once per day place message in system log.
             day = datetime.now().day
-            subprocess.call(["systemd-cat", "-t", "python", "echo", "Network: all water sensors on-line"])
+            subprocess.call(["systemd-cat", "-t", "python", "echo", "Network: all devices on-line"])
 
         sleep(10)
 

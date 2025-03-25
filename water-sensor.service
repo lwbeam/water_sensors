@@ -4,8 +4,8 @@ After=network.target
 
 [Service]
 ExecStartPre=/bin/sleep 10
-ExecStart=/usr/bin/python3 -u water_sensors.py
-WorkingDirectory=/home/pi/sensors
+ExecStart=/home/pi/water_sensors/bin/python -u water_sensors.py
+WorkingDirectory=/home/pi/water_sensors
 StandardOutput=inherit
 StandardError=inherit
 Restart=always

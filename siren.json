@@ -1,0 +1,11 @@
+{
+    "enabled": false,
+    "address": "XXX.XXX.XXX.XXX",
+    "pin": "123456",
+    "online": 3,
+    "sound": "1",
+    "volume": "1",
+    "duration": "88888",
+    "test": false
+}
+
