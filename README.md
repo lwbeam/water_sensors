@@ -54,6 +54,8 @@ However, if you've aquired a _new_ Water Sensor, replaced your router, or for wh
 - Configure your router to assign a **static IP address** to the Water Sensor.
 
 NOTE: The above also applies to the Home Siren.
+
+Finally, if you don't have a router or access point that supports WPS-PBC, you can use these [instructions](WPS-PBC.md) to configure a Raspberry Pi computer as a _bridged access point_ with WPS-PBC support.
 #### 3. Configure Water Sensors (required)
 The `config.json` file contains an array of objects; one for each Water Sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`, `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network (`3`, `2` or `1` = _online_; `0` = _offline_) or in the alarm state (`true` = _water detected_; `false` = _water not detected_). Note that `online` actually tracks the remaining number of consecutive times a sensor is allowed to **not** respond to a _ping_ before it is considered _offline_. This was altered (from simply `true` or `false`) in an attempt to reduce the number of nuisance notifications due to intermittent Wi-Fi interference (e.g., microwave ovens), and can be adjusted by changing the value assigned to `total_attempts` on line 147 of `water_sensors.py`. 
 
