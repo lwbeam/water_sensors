@@ -159,5 +159,47 @@ sudo systemctl daemon-reload
 sudo systemctl enable water-sensor.service
 sudo systemctl start water-sensor.service
 ```
+## Running Inside a Docker Container
+As an alternative to running the script as a native service, it can be run inside a Docker container on any machine that has [Docker](https://docs.docker.com/get-docker/) installed.
+
+#### 1. Install Docker (required)
+Install Docker Desktop (macOS/Windows) or the Docker Engine (Linux) by following the instructions on the [Docker website](https://docs.docker.com/get-docker/).
+
+#### 2. Clone the Repository (required)
+If you haven't already, clone the repository:
+```Shell
+git clone https://github.com/lwbeam/water_sensors water_sensors
+cd water_sensors
+```
+
+#### 3. Configure the Sensors and Notifications (required)
+Edit the configuration files exactly as described in steps 3–7 of the [Installation](#installation) section above (`config.json`, and optionally `siren.json`, `smtp.json`, `push.json`, `ifttt.json`). These files are mounted into the container as volumes, so you can edit them at any time without rebuilding the image.
+
+#### 4. Build and Start the Container (required)
+From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
+```Shell
+docker compose up -d --build
+```
+This builds a Debian Bookworm–based image, installs Python 3 and the required packages (`aiohttp`, `xmltodict`), and starts the monitoring script.
+
+#### 5. View Logs
+To follow the log output from the running container:
+```Shell
+docker compose logs -f
+```
+
+#### 6. Stop the Container
+```Shell
+docker compose down
+```
+
+#### 7. Updating Configuration
+Because the `json` configuration files are mounted as volumes, you can edit them directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required.
+
+To rebuild the image after changes to `water_sensors.py` or `Dockerfile`:
+```Shell
+docker compose up -d --build
+```
+
 ## Acknowledgements
 I spent many hours attempting to gain a basic understanding of SOAP and HNAP, but completely failed to produce anything remotely useable, until I discovered the Python classes (`NanoSOAPClient` and `HNAPClient`) created by [Pierre Ståhl](https://github.com/postlund/dlink_hnap). I shamelessly _borrowed_ these classes, as well as other bits of his code, for the original version of this script. By tinkering with these classes, I subsequently gained a sufficient understanding of SOAP and HNAP (as well as Python) that enabled me to simplify them into a single, more error tolerant class (`HNAPClient`), with slightly improved network efficiency. As a result, I am extremely grateful to Pierre for sharing his code.
