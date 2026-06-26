@@ -1,0 +1,10 @@
+services:
+  water-sensors:
+    build: .
+    restart: always
+    volumes:
+      - ./config.json:/app/config.json
+      - ./smtp.json:/app/smtp.json
+      - ./push.json:/app/push.json
+      - ./ifttt.json:/app/ifttt.json
+      - ./siren.json:/app/siren.json
