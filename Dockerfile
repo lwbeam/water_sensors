@@ -1,4 +1,4 @@
-FROM debian:your-distro
+FROM debian:trixie-slim
 
 # Install Python 3, pip, and ping
 RUN apt update && \
