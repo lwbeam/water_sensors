@@ -159,23 +159,23 @@ sudo systemctl daemon-reload
 sudo systemctl enable water-sensor.service
 sudo systemctl start water-sensor.service
 ```
-## Running Inside a Docker Container
-As an alternative to running the script as a native service, it can be run inside a Docker container on any machine that has [Docker](https://docs.docker.com/get-docker/) installed.
+## Run Inside Docker Container
+As an alternative to running this script as a native service, it can be run inside a Docker container on any machine that has [Docker](https://docs.docker.com/get-docker/) installed.
 
 #### 1. Install Docker (required)
-Install Docker Desktop (macOS/Windows) or the Docker Engine (Linux) by following the instructions on the [Docker website](https://docs.docker.com/get-docker/).
+[Docker Desktop](https://docs.docker.com/get-docker/desktop/) can be installed on Windows, Mac or Linux computers, and [Docker Engine](https://docs.docker.com/get-docker/engine/) can be installed on Linux computers without a desktop environment.
 
-#### 2. Clone the Repository (required)
-If you haven't already, clone the repository:
+#### 2. Clone Repository (required)
+If you haven't done so already, install [Git](https://git-scm.com/install/), and clone the repository:
 ```Shell
 git clone https://github.com/lwbeam/water_sensors water_sensors
 cd water_sensors
 ```
 
-#### 3. Configure the Sensors and Notifications (required)
-Edit the configuration files exactly as described in steps 3–7 of the [Installation](#installation) section above (`config.json`, and optionally `siren.json`, `smtp.json`, `push.json`, `ifttt.json`). These files are mounted into the container as volumes, so you can edit them at any time without rebuilding the image.
+#### 3. Configure Router, Sensors and Notifications (required)
+Edit the configuration files as described in Steps 3–7 of the [Installation](#installation) section above (`config.json`, and optionally `siren.json`, `smtp.json`, `push.json`, `ifttt.json`). These files are mounted into the container as volumes, so you can edit them at any time without rebuilding the image.
 
-#### 4. Build and Start the Container (required)
+#### 4. Build and Start Container (required)
 From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
 ```Shell
 docker compose up -d --build
@@ -188,7 +188,7 @@ To follow the log output from the running container:
 docker compose logs -f
 ```
 
-#### 6. Stop the Container
+#### 6. Stop Container
 ```Shell
 docker compose down
 ```
