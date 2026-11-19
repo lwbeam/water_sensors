@@ -197,7 +197,7 @@ docker compose down
 ```
 
 #### 8. Updating Configuration
-As the `json` configuration files are mounted as volumes, they can be edited directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required. `config.json` and `siren.json` are read repeatedly, so no action is required for the changes made to these files to take effect. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+Given the `json` configuration files are mounted as volumes, they can be edited directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required. Files `config.json` and `siren.json` are read repeatedly, so no action is required for changes made to these files to take effect. However, files `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
 
 To rebuild the image after changes to `water_sensors.py` or `Dockerfile`:
 ```Shell
