@@ -166,17 +166,17 @@ As an alternative to running this script as a native service, it can be run insi
 [Docker Desktop](https://docs.docker.com/get-docker/desktop/) can be installed on Windows, Mac or Linux computers, and [Docker Engine](https://docs.docker.com/get-docker/engine/) can be installed on Linux computers without a desktop environment.
 
 #### 2. Clone Repository (required)
-If you haven't done so already, install [Git](https://git-scm.com/install/), and clone the repository:
+If you haven't already done so, install **Git** (using the [instructions](https://git-scm.com/install/) appropriate for your machine), and clone the repository:
 ```Shell
 git clone https://github.com/lwbeam/water_sensors water_sensors
 cd water_sensors
 ```
 
 #### 3. Configure Router (required)
-Ensure that the Water Sensors and Siren are connected to your network and assigned a **static IP address**, per Step 2 of the [Installation](#installation) section above.
+Ensure that the Water Sensors and Siren are connected to your network, and assigned a **static IP address**, per [Installation](#installation) Step 2.
 
 #### 4. Configure Sensors and Notifications (required)
-Update the configuration files, as required, per Steps 3 thru 7 of the [Installation](#installation) section above. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+Update the configuration files (as required), per [Installation](#installation) Steps 3 thru 7. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
 
 #### 5. Build and Start Container (required)
 From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
