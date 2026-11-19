@@ -1,8 +1,8 @@
-FROM debian:bookworm-slim
+FROM debian:your-distro
 
 # Install Python 3, pip, and ping
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends python3 python3-pip iputils-ping && \
+RUN apt update && \
+  apt install -y --no-install-recommends python3 python3-pip icmplib && \
   rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
