@@ -172,29 +172,32 @@ git clone https://github.com/lwbeam/water_sensors water_sensors
 cd water_sensors
 ```
 
-#### 3. Configure Router, Sensors and Notifications (required)
-Edit the configuration files as described in Steps 3–7 of the [Installation](#installation) section above (`config.json`, and optionally `siren.json`, `smtp.json`, `push.json`, `ifttt.json`). These files are mounted into the container as volumes, so you can edit them at any time without rebuilding the image.
+#### 3. Configure Router (required)
+Ensure that the Water Sensors and Siren are connected to your network and assigned a **static IP address**, per Step 2 of the [Installation](#installation) section above.
 
-#### 4. Build and Start Container (required)
+#### 4. Configure Sensors and Notifications (required)
+Update the configuration files, as required, per Steps 3 thru 7 of the [Installation](#installation) section above. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+
+#### 5. Build and Start Container (required)
 From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
 ```Shell
 docker compose up -d --build
 ```
-This builds a Debian Bookworm–based image, installs Python 3 and the required packages (`aiohttp`, `xmltodict`), and starts the monitoring script.
+This builds a Debian Trixie–based image, installs Python 3 and the required packages (`aiohttp`, `xmltodict`, `icmplib`), and starts the monitoring script.
 
-#### 5. View Logs
+#### 6. View Logs
 To follow the log output from the running container:
 ```Shell
 docker compose logs -f
 ```
 
-#### 6. Stop Container
+#### 7. Stop Container
 ```Shell
 docker compose down
 ```
 
-#### 7. Updating Configuration
-Because the `json` configuration files are mounted as volumes, you can edit them directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required.
+#### 8. Updating Configuration
+Because the `json` configuration files are mounted as volumes, they can be edited directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required. `config.json` and `siren.json` are read repeatedly, so no action is required for the changes made to these files to take effect. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
 
 To rebuild the image after changes to `water_sensors.py` or `Dockerfile`:
 ```Shell
