@@ -7,11 +7,11 @@ This Python 3 script monitors one or more D-Link DCH-S160 Water Sensors and send
 
 The script can also active a D-Link DCH-S220 Home Siren, when water has been detected by a water sensor.
 
-The script was initially developed on a Raspberry Pi 3B+ single board computer running Buster, was subsequently tested with Bullseye and Bookworm, and will likely run on any Linux-based computer, with little or no modification. Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account.
+The script was initially developed on a Raspberry Pi 3B+ single board computer running Buster, was subsequently tested with Bullseye, Bookworm and Trixie, and will likely run on any Linux-based computer, with little or no modification. The script employs functions that are only available in Python 3.7 or greater. Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account.
 
 The script also includes rudimentary [IFTTT](https://ifttt.com) support, which can be used to generate the above notifications via the **IFTTT** mobile app. It is hoped that this will provide the user with a starting point from which to create more complicated and useful IFTTT applets.
 ## Background
-The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appeared_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 [announced](https://www.mydlink.com/faq#id-topFAQ/ans-4242) that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users were no longer able to login into their D-Link accounts via this app, the app was removed from the Apple and Android app stores, and it ceased to function. As a result, any device **not supported** by D-Link's current mobile apps has become unusable. This includes the DCH-S160 Wi-Fi Water Sensor and the DCH-S220 Home Siren.
+The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appeared_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 announced that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users were no longer able to login into their D-Link accounts via this app, the app was removed from the Apple and Android app stores, and it ceased to function. As a result, any devices **not supported** by D-Link's current mobile apps have become unusable. This includes the DCH-S160 Wi-Fi Water Sensor and the DCH-S220 Home Siren.
 ## Installation
 #### 1. Copy Files (required)
 This Python script ran without issue under Buster and Bullseye, using the system version of Python. However, starting with Bookworm, it is recommended that each Python script be executed in its own virtual environment. To do so, first create the virtual environment (e.g., `water_sensors`), then copy the Python script and associated `json` configuration files into the newly created folder, and finally install the required dependent Python packages. 
@@ -28,11 +28,11 @@ git clone https://github.com/lwbeam/water_sensors water_sensors
 Start the virtual environment using the following commands:
 ```Shell
 cd water_sensors
-source env/bin/activate
+source bin/activate
 ```
 Install the dependent Python packages using the following command:
 ```Shell
-pip install aiohttp xmltodict
+pip install aiohttp xmltodict icmplib
 ```
 Ensure that the script is executable using the following command:
 ```Shell
@@ -57,9 +57,9 @@ NOTE: The above also applies to the Home Siren.
 
 Finally, if you don't have a router or access point that supports WPS-PBC, you can use these [instructions](WPS-PBC.md) to configure a Raspberry Pi computer as a _bridged access point_ with WPS-PBC support.
 #### 3. Configure Water Sensors (required)
-The `config.json` file contains an array of objects; one for each Water Sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`, `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network (`3`, `2` or `1` = _online_; `0` = _offline_) or in the alarm state (`true` = _water detected_; `false` = _water not detected_). Note that `online` actually tracks the remaining number of consecutive times a sensor is allowed to **not** respond to a _ping_ before it is considered _offline_. This was altered (from simply `true` or `false`) in an attempt to reduce the number of nuisance notifications due to intermittent Wi-Fi interference (e.g., microwave ovens), and can be adjusted by changing the value assigned to `total_attempts` on line 147 of `water_sensors.py`. 
+The `config.json` file contains an array of objects; one for each water sensor. Each object has six properties: `enabled`, `name`, `address`, `pin`, `online`, and `status`. `online` and `status` are used by the script to keep track of whether or not the sensor is connected to the network (`3`, `2` or `1` = _online_; `0` = _offline_) or in the alarm state (`true` = _water detected_; `false` = _water not detected_). Note that `online` actually tracks the remaining number of consecutive times a sensor is allowed to **not** respond to a _ping_ before it is considered _offline_. This was altered (from simply `true` or `false`) in an attempt to reduce the number of nuisance notifications due to intermittent Wi-Fi interference (e.g., microwave ovens), and can be adjusted by changing the value assigned to `TOTAL_ATTEMPTS` on line 149 of `water_sensors.py`. 
 
-To properly configure the script, ensure that there is an object in the `sensor` array for each Water Sensor connected to your network, and update the `enabled`, `name`, `address`, and `pin` properties for each. `enabled` can be used to _ignore_ a sensor (i.e., disable monitoring it) without having to remove its information from the file. `name` is used to identify the sensor in the e-mail and/or push notifications, `address` is its static IP address, and `pin` is its security PIN code (see the label on the back of the sensor). In its present form, the file contains two objects. If you only have one Water Sensor, you can either delete the unused object or leave its `enabled` property set to `false`.
+To properly configure the script, ensure that there is an object in the `sensor` array for each water sensor connected to your network, and update the `enabled`, `name`, `address`, and `pin` properties for each. `enabled` can be used to _ignore_ a sensor (i.e., disable monitoring it) without having to remove its information from the file. `name` is used to identify the sensor in the e-mail and/or push notifications, `address` is its static IP address, and `pin` is its security PIN code (see the label on the back of the sensor). In its present form, the file contains two objects. If you only have one water sensor, you can either delete the unused object or leave its `enabled` property set to `false`.
 
 ```json
 {

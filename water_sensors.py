@@ -4,8 +4,6 @@
 
 import hmac
 import logging
-import asyncio
-import aiohttp
 import xmltodict
 import xml.etree.ElementTree as ET
 
@@ -132,19 +130,23 @@ class HNAPClient:
 
 def main():
 
-    from datetime import datetime
+    import sys
     import json
     import urllib
     import smtplib
     import os.path
+    import asyncio
+    import aiohttp
     import subprocess
     import http.client
     from time import sleep
+    from icmplib import ping
+    from datetime import datetime
 
     push_messages = list()
     day = datetime.now().day
 
-    total_attempts = 3  # Any integer value greater than zero.
+    TOTAL_ATTEMPTS = 3  # Any integer value greater than zero.
 
 
     async def post_request(address, password, action, state, **kwargs):
@@ -184,6 +186,9 @@ def main():
 
         return None if state == None else resp.get(state) == "true"
 
+
+    if sys.version_info < (3, 7):
+        sys.exit("Python version 3.7 or greater required.")
 
     if os.path.exists("smtp.json"):
         with open("smtp.json") as smtp_file:
@@ -229,10 +234,11 @@ def main():
 
         if siren["enabled"]:  # If enabled, check if siren is on-line.
 
-            on_line = not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", siren["address"]], stdout = subprocess.DEVNULL))
+            on_line = ping(siren["address"], count=1, timeout=10, privileged=False).is_alive
             if on_line:
                 try:
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
                     if siren["test"]:
                         loop.run_until_complete(post_request(  # Test siren.
                             siren["address"], siren["pin"], "SetSoundPlay", None, SoundType=1, Volume=1, Duration=1
@@ -245,6 +251,8 @@ def main():
                     _LOGGER.info("Siren status: %s", status)
                 except AuthenticationError:
                     on_line = False
+                finally:
+                    loop.close()
 
             if on_line:
                 if siren["online"] == 0:  # If previously off-line.
@@ -254,8 +262,8 @@ def main():
                         push_messages.append('Siren connected to network!')
                     send_message = True
 
-                if siren["online"] < total_attempts:  # Reset counter.
-                    siren["online"] = total_attempts
+                if siren["online"] < TOTAL_ATTEMPTS:  # Reset counter.
+                    siren["online"] = TOTAL_ATTEMPTS
                     save_siren = True
             else:
                 if siren["online"] == 1:  # If previously on-line, and very last attempt failed.
@@ -280,16 +288,19 @@ def main():
         for sensor in data["sensor"]:
             if sensor["enabled"]:
 
-                on_line = not bool(subprocess.call(["ping", "-q", "-w 10", "-c 1", sensor["address"]], stdout = subprocess.DEVNULL))
+                on_line = ping(sensor["address"], count=1, timeout=10, privileged=False).is_alive
                 if on_line:
                     try:
-                        loop = asyncio.get_event_loop()
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
                         status = loop.run_until_complete(post_request(  # Get water sensor status.
                             sensor["address"], sensor["pin"], "GetWaterDetectorState", "IsWater"
                         ))
                         _LOGGER.info("Sensor status: %s", status)
                     except AuthenticationError:
                         on_line = False
+                    finally:
+                        loop.close()
 
                 if on_line:
                     if sensor["status"] != status:  # If sensor status has changed.
@@ -299,9 +310,10 @@ def main():
                             if push["enabled"] or ifttt["enabled"]:
                                 push_messages.append('Water detected by ' + sensor["name"] + ' sensor!')
 
-                            if siren["enabled"] and siren["online"] == total_attempts:
+                            if siren["enabled"] and siren["online"] == TOTAL_ATTEMPTS:
                                 try:
-                                    loop = asyncio.get_event_loop()
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
                                     loop.run_until_complete(post_request(  # Start siren.
                                         siren["address"], siren["pin"], "SetSoundPlay", None,
                                         SoundType=siren["sound"], Volume=siren["volume"], Duration=siren["duration"]
@@ -310,6 +322,8 @@ def main():
                                     if siren["online"] > 1:  # Decrement counter.
                                         siren["online"] -= 1
                                         save_siren = True
+                                finally:
+                                    loop.close()
 
                         elif sensor["status"] and not status:  # True --> False.
                             if smtp["enabled"]:
@@ -317,9 +331,10 @@ def main():
                             if push["enabled"] or ifttt["enabled"]:
                                 push_messages.append('Water no longer detected by ' + sensor["name"] + ' sensor.')
 
-                            if siren["enabled"] and siren["online"] == total_attempts:
+                            if siren["enabled"] and siren["online"] == TOTAL_ATTEMPTS:
                                 try:
-                                    loop = asyncio.get_event_loop()
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
                                     loop.run_until_complete(post_request(  # Stop siren.
                                         siren["address"], siren["pin"], "SetAlarmDismissed", None
                                     ))
@@ -327,6 +342,8 @@ def main():
                                     if siren["online"] > 1:  # Decrement counter.
                                         siren["online"] -= 1
                                         save_siren = True
+                                finally:
+                                    loop.close()
 
                         sensor["status"] = status
                         save_sensor = True
@@ -339,8 +356,8 @@ def main():
                             push_messages.append(sensor["name"] + ' water sensor connected to network!')
                         send_message = True
 
-                    if sensor["online"] < total_attempts:  # Reset counter.
-                        sensor["online"] = total_attempts
+                    if sensor["online"] < TOTAL_ATTEMPTS:  # Reset counter.
+                        sensor["online"] = TOTAL_ATTEMPTS
                         save_sensor = True
 
                 else:
