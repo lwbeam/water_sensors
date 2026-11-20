@@ -173,10 +173,10 @@ cd water_sensors
 ```
 
 #### 3. Configure Router (required)
-Ensure that the Water Sensors and Siren are connected to your network, and assigned a **static IP address**, per [Installation](#installation) Step 2.
+Ensure that the Water Sensors and Siren are connected to your network, and assigned a **static IP address**, per [Installation](#installation), Section 2, above.
 
 #### 4. Configure Sensors and Notifications (required)
-Update the configuration files (as required), per [Installation](#installation) Steps 3 thru 7. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+Make the required changes to the configuration files, per [Installation](#installation), Sections 3 thru 7, above. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
 
 #### 5. Build and Start Container (required)
 From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
