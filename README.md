@@ -7,9 +7,11 @@ This Python 3 script monitors one or more D-Link DCH-S160 Water Sensors and send
 
 The script can also active a D-Link DCH-S220 Home Siren, when water has been detected by a water sensor.
 
-The script was initially developed on a Raspberry Pi 3B+ single board computer running Buster, was subsequently tested with Bullseye, Bookworm and Trixie, and will likely run on any Linux-based computer, with little or no modification. The script employs functions that are only available in Python 3.7 or greater. Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account.
+The script was initially developed on a Raspberry Pi 3B+ single board computer running Buster, was subsequently tested with Bullseye, Bookworm and Trixie, and will likely run on any Linux-based computer, with little or no modification. The script employs functions that are only available in Python 3.7 or greater.
 
-The script also includes rudimentary [IFTTT](https://ifttt.com) support, which can be used to generate the above notifications via the **IFTTT** mobile app. It is hoped that this will provide the user with a starting point from which to create more complicated and useful IFTTT applets.
+Push notifications were implemented using [Pushover](https://pushover.net). This feature requires the user to create their own Pushover account.
+
+Finally, the script also includes rudimentary [IFTTT](https://ifttt.com) support, which can be used to generate  notifications via the **IFTTT** mobile app. It is hoped that this will provide the user with a starting point from which to create more complicated and useful IFTTT applets.
 ## Background
 The D-Link DCH-S160 Wi-Fi Water Sensor was introduced in late 2015. The sensor has no WebUI of its own, relying entirely on D-Link's cloud services and free **mydlink Home** mobile app for all of its functionality. Initially the app provided push notification and IFTTT support. E-mail support was eventually added, but then quietly disabled in 2020, even though the app _appeared_ to still provide this feature. During 2019 D-Link withdrew all technical support for this product, and in early 2022 announced that it was withdrawing all support for the **mydlink Home** app. At the end of 2022 users were no longer able to login into their D-Link accounts via this app, the app was removed from the Apple and Android app stores, and it ceased to function. As a result, any devices **not supported** by D-Link's current mobile apps have become unusable. This includes the DCH-S160 Wi-Fi Water Sensor and the DCH-S220 Home Siren.
 ## Installation
@@ -43,15 +45,15 @@ Leave the virtual environment using the following command:
 deactivate
 ```
 #### 2. Configure Router (required)
-If your Water Sensor is already connected to your network, the only thing you **must** do to use this script is ensure that your router is configured to assign a static IP address to the sensor. Refer to your router's user manual for instructions on how to accomplish this.
+If your water sensor is already connected to your network, the only thing you **must** do to use this script is ensure that your router is configured to assign a static IP address to the sensor. Refer to your router's user manual for instructions on how to accomplish this.
 
-However, if you've aquired a _new_ Water Sensor, replaced your router, or for whatever reason had to _reset_ an existing Water Sensor, you'll need to configure your router to provide the Water Sensor with access to your Wi-Fi network. In the past this would have been done entirely via the **mydlink Home** app. Without the app, it must be done using Wi-Fi Protected Setup Push-Button Configuration (WPS-PBC). To accomplish this, complete the following steps:
-- Ensure **Router's WPS-PBC** feature is enabled. Refer to your router's user manual for instructions on how to accomplish this. If your router doesn't have this feature, you won't be able to connect your Water Sensor to your Wi-Fi network.
-- **Factory Reset** the Water Sensor. The reset button is located in the hole below the WPS button on the side of the sensor. With the sensor plugged in, use a bent paperclip to hold in the reset button for at least 5 seconds, or until the LED on the side of the senser goes solid red. Release the button and wait until the red light on the **front** of the sensor goes out. The LED on the side should still be solid red.
-- **Power Cycle** the Water Sensor. Unplug the senser, then plug it back in. Wait for the light on the **front** of the sensor to go out and the LED on the side of the sensor to blink orange.
+However, if you've acquired a _new_ water sensor, replaced your router, or for whatever reason had to _reset_ an existing water sensor, you'll need to configure your router to provide the water sensor with access to your Wi-Fi network. In the past this would have been done entirely via the **mydlink Home** app. Without the app, it must be done using Wi-Fi Protected Setup Push-Button Configuration (WPS-PBC). To accomplish this, complete the following steps:
+- Ensure **Router's WPS-PBC** feature is enabled. Refer to your router's user manual for instructions on how to accomplish this. If your router doesn't have this feature, you won't be able to connect your water sensor to your Wi-Fi network.
+- **Factory Reset** the water sensor. The reset button is located in the hole below the WPS button on the side of the sensor. With the sensor plugged in, use a bent paperclip to hold in the reset button for at least 5 seconds, or until the LED on the side of the sensor goes solid red. Release the button and wait until the red light on the **front** of the sensor goes out. The LED on the side should still be solid red.
+- **Power Cycle** the water sensor. Unplug the sensor, then plug it back in. Wait for the light on the **front** of the sensor to go out and the LED on the side of the sensor to blink orange.
 - Press and release the **Router's WPS Button**.
 - Press and release the **Water Sensor's WPS Button**. The LED on the side of the sensor should start to blink green. Wait until it goes solid green.
-- Configure your router to assign a **static IP address** to the Water Sensor.
+- Configure your router to assign a **static IP address** to the water sensor.
 
 NOTE: The above also applies to the Home Siren.
 
@@ -159,5 +161,50 @@ sudo systemctl daemon-reload
 sudo systemctl enable water-sensor.service
 sudo systemctl start water-sensor.service
 ```
+## Run Inside Docker Container
+As an alternative to running this script as a native service, it can be run inside a Docker container on any machine that has [Docker](https://docs.docker.com/get-docker/) installed.
+
+#### 1. Install Docker (required)
+[Docker Desktop](https://docs.docker.com/get-docker/desktop/) can be installed on Windows, Mac or Linux computers, and [Docker Engine](https://docs.docker.com/get-docker/engine/) can be installed on Linux computers without a desktop environment.
+
+#### 2. Clone Repository (required)
+If you haven't already done so, install **Git** (using the [instructions](https://git-scm.com/install/) appropriate for your machine), and clone the repository:
+```Shell
+git clone https://github.com/lwbeam/water_sensors water_sensors
+cd water_sensors
+```
+
+#### 3. Configure Router (required)
+Ensure that the water sensors and siren are connected to your network, and assigned a **static IP address**, per [Installation](#installation), Section 2, above.
+
+#### 4. Configure Sensors and Notifications (required)
+Make the required changes to the configuration files, per [Installation](#installation), Sections 3 thru 7, above. The `json` files are mounted into the container as volumes, so can be edited any time without rebuilding the image. However, `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+
+#### 5. Build and Start Container (required)
+From the `water_sensors` directory, build the image and start the container in the background using Docker Compose:
+```Shell
+docker compose up -d --build
+```
+This builds a Debian Trixie–based image, installs Python 3, along with the required packages (`aiohttp`, `xmltodict`, `icmplib`), and starts the monitoring script.
+
+#### 6. View Logs
+To follow the log output from the running container:
+```Shell
+docker compose logs -f
+```
+
+#### 7. Stop Container
+```Shell
+docker compose down
+```
+
+#### 8. Updating Configuration
+Given the `json` configuration files are mounted as volumes, they can be edited directly on the host and the running container will pick up the changes on its next read cycle — no rebuild required. Files `config.json` and `siren.json` are read repeatedly, so no action is required for changes made to these files to take effect. However, files `smtp.json`, `push.json`, and `ifttt.json` are only read once at startup, so changes made to these files will only take effect after the container has been restarted.
+
+Finally, the image must be rebuilt after changes have been made to `water_sensors.py` or `Dockerfile`:
+```Shell
+docker compose up -d --build
+```
+
 ## Acknowledgements
 I spent many hours attempting to gain a basic understanding of SOAP and HNAP, but completely failed to produce anything remotely useable, until I discovered the Python classes (`NanoSOAPClient` and `HNAPClient`) created by [Pierre Ståhl](https://github.com/postlund/dlink_hnap). I shamelessly _borrowed_ these classes, as well as other bits of his code, for the original version of this script. By tinkering with these classes, I subsequently gained a sufficient understanding of SOAP and HNAP (as well as Python) that enabled me to simplify them into a single, more error tolerant class (`HNAPClient`), with slightly improved network efficiency. As a result, I am extremely grateful to Pierre for sharing his code.
